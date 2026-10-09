@@ -177,7 +177,14 @@
   var PAGES = { office: 'board', setup: 'setup', customers: 'customers', schedule: 'schedule', tech: 'tech' };
   function pageKey(p) { var pg = String(p.p || ''); if (!pg) pg = ROLE === 'tech' ? 'tech' : 'office'; return PAGES[pg] ? pg : ''; }
   var CACHE_CALLS = { pmOfficeLoad: 1, pmTechLoad: 1, pmSchedLoad: 1 };
+  /** Saves that never make you wait: kept on the phone first, then sent in the background (also safe if the app is closed). */
+  var BEHIND = { pmCustSave: 1, pmUnitSave: 1 };
   function post(body, win) {
+    if (body.op === 'call' && BEHIND[body.fn] && OFFLINE[body.fn]) {
+      var res = OFFLINE[body.fn](body.args || [], win);
+      if (!OFF) setTimeout(sync, 30);
+      return Promise.resolve({ ok: true, result: res });
+    }
     if (OFF || navigator.onLine === false) return offline(body, win);
     return postRaw(body).then(function (j) {
       setOff(false);
@@ -199,8 +206,18 @@
     // fnName: function (args, win) { enqueue(...); return result; }   ← added phase by phase
     pmUnitSave: function (a) {
       var u = a[2] || {}, fake = u.id || nextFake('u');
+      if (!u.id) u.ref = u.ref || fake;                      // lets the script spot a save that was sent twice
       enqueue('pmUnitSave', a, '🔥 ' + (u.type || 'Equipment') + (u.make ? ' (' + u.make + ')' : ''), u.id ? {} : { fake: fake });
-      return { id: fake, cust: null, message: SAVED };
+      return { id: fake, cust: null, message: OFF ? SAVED : 'Saved ✓' };
+    },
+    pmCustSave: function (a, w) {
+      var id = a[1] || '', d = a[2] || {}, fake = id || nextFake('c');
+      if (!id) d.ref = d.ref || fake;
+      var cur = w && w.CUR && w.CUR.id === id && id ? JSON.parse(JSON.stringify(w.CUR)) : { id: fake, units: [], area: '', day: '', status: '', lastJob: '', heating: false, pmDue: '', pmDueNice: '', pmStatus: '', lastPm: '', zip: '', company: '' };
+      Object.keys(d).forEach(function (k) { if (k !== 'ref' && k !== 'force') cur[k] = d[k]; });
+      if (d.pmDue) { var m = String(d.pmDue).split('-'); cur.pmDueNice = new Date(Number(m[0]), Number(m[1]) - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
+      enqueue('pmCustSave', a, (id ? '✏️ ' : '🆕 ') + (cur.name || 'Customer'), id ? {} : { fake: fake });
+      return { id: fake, cust: cur, message: OFF ? SAVED : 'Saved ✓' };
     }
   };
   function offline(body, win) {
@@ -234,6 +251,7 @@
       postRaw({ op: 'call', fn: it.fn, args: sub(it.args) }).then(function (j) {
         var r = j.result;
         if (it.fake && r) IDMAP[it.fake] = (r && r.id) || r;      // a record made with no signal gets its real ID
+        if (r && r.merged && r.message) NOTICES.push(r.message);
         QUEUE.shift(); saveQ(); step();
       }, function (e) {
         if (e.net) { SYNCING = false; setOff(true); return; }
@@ -260,9 +278,12 @@
       ask({});
     });
   }
+  var NOTICES = [];
   function afterSync() {
     topbar();
     var w = win('board'); if (w) quietRefresh('board', w);
+    var cw = win('customers'); if (cw && cw.afterSync) { try { cw.afterSync(IDMAP); } catch (e) { } }
+    if (NOTICES.length) { openSheet('<h3>ℹ️ Heads up</h3>' + NOTICES.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '<button class="b" id="shClose">OK</button>'); NOTICES = []; document.getElementById('shClose').onclick = closeSheet; }
     if (!FAILED.length) try { TG && TG.HapticFeedback && TG.HapticFeedback.notificationOccurred('success'); } catch (e) { }
   }
   function outboxSheet() {
