@@ -176,7 +176,7 @@
   // screens saved on the phone so they open instantly (and with no signal)
   var PAGES = { office: 'board', setup: 'setup', customers: 'customers', schedule: 'schedule', tech: 'tech' };
   function pageKey(p) { var pg = String(p.p || ''); if (!pg) pg = ROLE === 'tech' ? 'tech' : 'office'; return PAGES[pg] ? pg : ''; }
-  var CACHE_CALLS = { pmOfficeLoad: 1, pmTechLoad: 1 };
+  var CACHE_CALLS = { pmOfficeLoad: 1, pmTechLoad: 1, pmSchedLoad: 1 };
   function post(body, win) {
     if (OFF || navigator.onLine === false) return offline(body, win);
     return postRaw(body).then(function (j) {
@@ -350,7 +350,7 @@
     ROLE = r; ls('pmRole', ROLE);
     document.body.classList.toggle('hasnav', ROLE === 'owner');
   }
-  function load(name, params, push, showIt) {
+  function load(name, params, push, showIt, bg) {
     var t = tab(name);
     if (showIt) { activate(name); if (!t.loaded) show('Loading…'); }
     progress(true);
@@ -362,16 +362,16 @@
       }
       t.fromCache = false; progress(false);
       return render(name, j.html, params, push);
-    }).catch(function (e) { progress(false); if (CUR === name || !CUR) show(e.message, true); else alert(e.message); });
+    }).catch(function (e) { progress(false); if (bg && CUR !== name) return; if (CUR === name || !CUR) show(e.message, true); else alert(e.message); });
   }
   /** Instant start: show the screen saved last time right away, then freshen it quietly behind the scenes. */
-  function quickStart(name, params) {
+  function quickStart(name, params, bg) {
     var k = pageKey(params || {});
     if (!k) return Promise.resolve(false);
     return kvGet('page:' + k).then(function (html) {
       if (!html) return false;
       var t = tab(name); t.fromCache = true;
-      activate(name);
+      if (!bg) activate(name);
       var fn = loadFnFor(name);                               // only screens that have their own saved data get it
       return Promise.all([render(name, html, params, false), fn ? kvGet('call:' + fn) : null]).then(function (r) {
         var w = r[0], saved = r[1];
@@ -395,7 +395,7 @@
     if (!busyTyping(w) || tries > 240) { fn(); return; }
     setTimeout(function () { whenIdle(w, fn, tries + 1); }, 1000);
   }
-  function loadFnFor(name) { return name === 'tech' ? 'pmTechLoad' : (name === 'board' || name === 'setup') ? 'pmOfficeLoad' : ''; }
+  function loadFnFor(name) { return name === 'tech' ? 'pmTechLoad' : (name === 'board' || name === 'setup') ? 'pmOfficeLoad' : name === 'schedule' ? 'pmSchedLoad' : ''; }
   function freshen(name, params, w) {
     if (OFF) return;
     progress(true);
@@ -412,6 +412,7 @@
     Promise.all([data, page]).then(function () { progress(false); T[name].fromCache = false; }, function (e) { progress(false); if (e && e.net) setOff(true); });
   }
   function quietRefresh(name, w) {
+    if (name === 'customers' && w && w.search) { whenIdle(w, function () { try { w.search(); } catch (e) { } }); return; }
     var fn = loadFnFor(name);
     try { if (fn && w && w.D && w.D.key && w.load && w.google) w.google.script.run.withSuccessHandler(function (d) { w.load(d); })[fn](w.D.key); } catch (e) { }
   }
@@ -455,10 +456,25 @@
       var g = b.getAttribute('data-go');
       try { TG && TG.HapticFeedback && TG.HapticFeedback.selectionChanged(); } catch (e) { }
       if (T[g] && T[g].loaded) { activate(g); quietRefresh(g, win(g)); return; }
-      var p = { board: 'office', customers: 'customers', schedule: 'schedule', setup: 'setup' }[g];
-      if (!quickStartOK(g, { p: p })) load(g, { p: p }, false, true);
+      if (T[g] && T[g].loading) { activate(g); show('Loading…'); return; }     // already loading in the background: it shows the moment it is ready
+      var p = NAVP[g];
+      if (!quickStartOK(g, p)) load(g, p, false, true);
     });
   });
+  /** Loads a section quietly behind the scenes, so tapping it later is instant. */
+  var NAVP = { board: { p: 'office' }, customers: { p: 'customers' }, schedule: { p: 'schedule' }, setup: { p: 'setup' } };
+  function prefetch(g) {
+    var t = tab(g);
+    if (t.loaded || t.loading) return Promise.resolve();
+    t.loading = quickStart(g, NAVP[g], true).then(function (q) { return q ? true : load(g, NAVP[g], false, false, true); })
+      .then(function () { t.loading = null; }, function () { t.loading = null; });
+    return t.loading;
+  }
+  function prefetchAll() {
+    if (ROLE !== 'owner') return;
+    var order = ['board', 'customers', 'schedule', 'setup'].filter(function (g) { return g !== CUR; });
+    (function next(i) { if (i >= order.length) return; prefetch(order[i]).then(function () { setTimeout(function () { next(i + 1); }, 300); }); })(0);
+  }
   function quickStartOK(g, params) { quickStart(g, params).then(function (q) { if (!q) load(g, params, false, true); }); return true; }
 
   // ---- 📲 home-screen app (works with no signal) — set up from Telegram ----
@@ -512,7 +528,7 @@
     if (!ROLE) { load(first, hash, false, true).then(afterFirst); return; }   // first time on this phone: ask the script who this is
     quickStart(first, hash).then(function (quick) { return quick ? true : load(first, hash, false, true); }).then(afterFirst);
   });
-  function afterFirst() { setTimeout(sync, 1500); }
+  function afterFirst() { setTimeout(sync, 1500); setTimeout(prefetchAll, 700); }
 })();
 </script>
 </body>
