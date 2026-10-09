@@ -372,8 +372,8 @@
       if (!html) return false;
       var t = tab(name); t.fromCache = true;
       activate(name);
-      var fn = name === 'tech' ? 'pmTechLoad' : 'pmOfficeLoad';
-      return Promise.all([render(name, html, params, false), kvGet('call:' + fn)]).then(function (r) {
+      var fn = loadFnFor(name);                               // only screens that have their own saved data get it
+      return Promise.all([render(name, html, params, false), fn ? kvGet('call:' + fn) : null]).then(function (r) {
         var w = r[0], saved = r[1];
         try { if (saved && w.load) w.load(saved); } catch (e) { }
         freshen(name, params, w);
