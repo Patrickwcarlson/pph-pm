@@ -188,11 +188,20 @@
   }
 
   // ---- what works with no signal. Later phases add the tech checklist, photos and visit-finished here. ----
-  function noSignal(what) { return Promise.reject(new Error('📴 No signal — ' + (what || 'this needs signal') + '. Everything you record is saved and sends when signal comes back.')); }
+  function noSignal(what) {
+    var why = navigator.onLine === false ? '📴 No signal' : '📴 Can\u2019t reach the PM script (weak signal — or, if you have good signal, the Web App URL on the Settings tab is wrong)';
+    return Promise.reject(new Error(why + ' — ' + (what || 'this needs signal') + '. Everything you record is saved and sends when signal comes back.'));
+  }
+  function nextFake(kind) { var n = Number(ls('pmFake') || 0) + 1; ls('pmFake', String(n)); return 'off-' + kind + n + '-' + Date.now().toString(36); }
   function enqueue(fn, args, label, extra) { QUEUE.push(Object.assign({ fn: fn, args: args, label: label, at: Date.now() }, extra || {})); saveQ(); }
   var SAVED = 'Saved on this phone (no signal). It sends by itself when signal comes back.';
   var OFFLINE = {
     // fnName: function (args, win) { enqueue(...); return result; }   ← added phase by phase
+    pmUnitSave: function (a) {
+      var u = a[2] || {}, fake = u.id || nextFake('u');
+      enqueue('pmUnitSave', a, '🔥 ' + (u.type || 'Equipment') + (u.make ? ' (' + u.make + ')' : ''), u.id ? {} : { fake: fake });
+      return { id: fake, cust: null, message: SAVED };
+    }
   };
   function offline(body, win) {
     if (body.op === 'page') {
@@ -395,6 +404,7 @@
     var data = fn && key ? post({ op: 'call', fn: fn, args: [key] }).then(function (j) {
       whenIdle(w, function () { try { if (w.load) w.load(j.result); } catch (e) { } });
     }) : Promise.resolve();
+    if (name === 'customers' && w && w.search) whenIdle(w, function () { try { w.search(); } catch (e) { } });
     var page = postRaw({ op: 'page', params: params || {} }).then(function (j) {     // newest version of the screen, for next time
       setRole(j.role);
       kvSet('page:' + pageKey(params || {}), j.html);
