@@ -178,7 +178,7 @@
   function pageKey(p) { var pg = String(p.p || ''); if (!pg) pg = ROLE === 'tech' ? 'tech' : 'office'; return PAGES[pg] ? pg : ''; }
   var CACHE_CALLS = { pmOfficeLoad: 1, pmTechLoad: 1, pmSchedLoad: 1 };
   /** Saves that never make you wait: kept on the phone first, then sent in the background (also safe if the app is closed). */
-  var BEHIND = { pmCustSave: 1, pmUnitSave: 1 };
+  var BEHIND = { pmCustSave: 1, pmUnitSave: 1, pmVisitArrive: 1, pmVisitUnsafe: 1, pmVisitFinish: 1 };
   function post(body, win) {
     if (body.op === 'call' && BEHIND[body.fn] && OFFLINE[body.fn]) {
       var res = OFFLINE[body.fn](body.args || [], win);
@@ -210,6 +210,9 @@
       enqueue('pmUnitSave', a, '🔥 ' + (u.type || 'Equipment') + (u.make ? ' (' + u.make + ')' : ''), u.id ? {} : { fake: fake });
       return { id: fake, cust: null, message: OFF ? SAVED : 'Saved ✓' };
     },
+    pmVisitArrive: function (a) { enqueue('pmVisitArrive', a, '📍 Arrived'); return { ok: true, message: OFF ? SAVED : 'Saved ✓' }; },
+    pmVisitUnsafe: function (a) { enqueue('pmVisitUnsafe', a, '⚠️ Unsafe equipment alert'); return { ok: true, message: OFF ? 'Saved — the alert sends the moment signal comes back. Call the office if it can’t wait.' : 'Sending the alert…' }; },
+    pmVisitFinish: function (a) { enqueue('pmVisitFinish', a, '✅ Visit finished'); return { ok: true, message: OFF ? 'Visit saved on this phone (no signal). It sends by itself when signal comes back.' : 'Visit finished ✓' }; },
     pmCustSave: function (a, w) {
       var id = a[1] || '', d = a[2] || {}, fake = id || nextFake('c');
       if (!id) d.ref = d.ref || fake;
@@ -283,6 +286,7 @@
     topbar();
     var w = win('board'); if (w) quietRefresh('board', w);
     var cw = win('customers'); if (cw && cw.afterSync) { try { cw.afterSync(IDMAP); } catch (e) { } }
+    var tw = win('tech'); if (tw) { try { if (tw.afterSync) tw.afterSync(IDMAP); } catch (e) { } quietRefresh('tech', tw); }
     if (NOTICES.length) { openSheet('<h3>ℹ️ Heads up</h3>' + NOTICES.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '<button class="b" id="shClose">OK</button>'); NOTICES = []; document.getElementById('shClose').onclick = closeSheet; }
     if (!FAILED.length) try { TG && TG.HapticFeedback && TG.HapticFeedback.notificationOccurred('success'); } catch (e) { }
   }
