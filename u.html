@@ -18,6 +18,11 @@
   .btn { display:block; text-align:center; text-decoration:none; border-radius:12px; padding:15px; font-size:17px; font-weight:800; margin-top:10px; }
   .pri { background:var(--blue); color:#fff; } .sec { background:#eaf1fb; color:var(--blue); }
   .mut { color:var(--mut); font-size:14px; line-height:1.5; }
+  .h { padding:11px 0; border-top:1px solid var(--line); font-size:15px; line-height:1.45; } .lbl + .h { border-top:0; }
+  .h .d { font-weight:800; } .h .k { color:var(--mut); font-size:13px; } .h .by { float:right; color:var(--mut); font-size:13px; font-weight:700; }
+  .h .p { color:var(--mut); font-size:13px; }
+  .more { border:0; background:none; color:var(--blue); font-weight:800; font-size:15px; padding:10px 0 0; }
+  .tech { display:block; text-align:center; color:var(--mut); font-size:14px; font-weight:700; margin-top:18px; text-decoration:none; }
 </style></head>
 <body><div class="wrap" id="app"><div class="hd"><div class="co">🔥</div><h1>Loading…</h1></div></div>
 <script>
@@ -45,8 +50,21 @@
         (u.location ? '<div class="row"><span>Location</span><b>' + esc(u.location) + '</b></div>' : '') +
       '</div>' +
       (d.book ? '<a class="btn pri" href="' + esc(d.book) + '">📅 Book my next visit</a>' : '') + call +
-      '<p class="mut" style="text-align:center;margin-top:16px">Sticker ' + esc(d.code) + ' · ' + esc(d.company) + '</p>';
+      history(d.history || []) +
+      (d.techLink ? '<a class="tech" href="' + esc(d.techLink) + '">🔧 Log work (techs)</a>' : '') +
+      '<p class="mut" style="text-align:center;margin-top:12px">Sticker ' + esc(d.code) + ' · ' + esc(d.company) + '</p>';
     document.title = d.company;
+    var m = document.getElementById('more');
+    if (m) m.onclick = function () { [].forEach.call(document.querySelectorAll('.h.x'), function (x) { x.style.display = ''; }); m.style.display = 'none'; };
+  }
+  /** Every repair and maintenance on this unit, newest first (the first 8 show, the rest behind "Show all"). */
+  function history(list) {
+    if (!list.length) return '';
+    return '<div class="card" style="margin-top:12px"><div class="lbl">Service history</div>' + list.map(function (x, i) {
+      return '<div class="h' + (i >= 8 ? ' x" style="display:none' : '') + '">' + (x.by ? '<span class="by">' + esc(x.by) + '</span>' : '') +
+        '<span class="d">' + esc(x.date) + '</span> <span class="k">· ' + esc(x.kind) + '</span><div>' + esc(x.work) + '</div>' +
+        (x.parts ? '<div class="p">Parts: ' + esc(x.parts) + '</div>' : '') + '</div>';
+    }).join('') + (list.length > 8 ? '<button class="more" id="more">Show all ' + list.length + '</button>' : '') + '</div>';
   }
   function go(url) {
     fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'app=1', { method: 'POST', body: JSON.stringify({ op: 'unitpage', s: code }) })

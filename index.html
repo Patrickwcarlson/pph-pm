@@ -178,7 +178,7 @@
   function pageKey(p) { var pg = String(p.p || ''); if (!pg) pg = ROLE === 'tech' ? 'tech' : 'office'; return PAGES[pg] ? pg : ''; }
   var CACHE_CALLS = { pmOfficeLoad: 1, pmTechLoad: 1, pmSchedLoad: 1 };
   /** Saves that never make you wait: kept on the phone first, then sent in the background (also safe if the app is closed). */
-  var BEHIND = { pmCustSave: 1, pmUnitSave: 1, pmVisitArrive: 1, pmVisitUnsafe: 1, pmVisitFinish: 1 };
+  var BEHIND = { pmCustSave: 1, pmUnitSave: 1, pmVisitArrive: 1, pmVisitUnsafe: 1, pmVisitFinish: 1, pmUnitLog: 1 };
   function post(body, win) {
     if (body.op === 'call' && BEHIND[body.fn] && OFFLINE[body.fn]) {
       var res = OFFLINE[body.fn](body.args || [], win);
@@ -212,6 +212,7 @@
     },
     pmVisitArrive: function (a) { enqueue('pmVisitArrive', a, '📍 Arrived'); return { ok: true, message: OFF ? SAVED : 'Saved ✓' }; },
     pmVisitUnsafe: function (a) { enqueue('pmVisitUnsafe', a, '⚠️ Unsafe equipment alert'); return { ok: true, message: OFF ? 'Saved — the alert sends the moment signal comes back. Call the office if it can’t wait.' : 'Sending the alert…' }; },
+    pmUnitLog: function (a) { var e = a[2] || {}; enqueue('pmUnitLog', a, '🔧 ' + (e.kind || 'Work') + ' logged on a unit'); return { ok: true, message: OFF ? SAVED : 'Saved to the unit\u2019s history ✓' }; },
     pmVisitFinish: function (a) { enqueue('pmVisitFinish', a, '✅ Visit finished'); return { ok: true, message: OFF ? 'Visit saved on this phone (no signal). It sends by itself when signal comes back.' : 'Visit finished ✓' }; },
     pmCustSave: function (a, w) {
       var id = a[1] || '', d = a[2] || {}, fake = id || nextFake('c');
@@ -543,6 +544,35 @@
     }, 1200);
   }
 
+  // ---- 📷 scan a unit sticker with Telegram's own QR scanner ----
+  function stickerFrom(t) {
+    t = String(t || '');
+    var m = t.match(/[?&]s=([A-Za-z0-9-]+)/) || t.match(/startapp=u_([A-Za-z0-9]+)/) || t.match(/^\s*([A-Za-z0-9]{6})\s*$/);
+    return m ? m[1].toUpperCase() : '';
+  }
+  try {
+    if (TG && TG.showScanQrPopup && (!TG.isVersionAtLeast || TG.isVersionAtLeast('6.4'))) window.__pmScan = function (cb) {
+      TG.showScanQrPopup({ text: 'Point at the QR code on the unit sticker' }, function (t) {
+        var c = stickerFrom(t); if (!c) return false;                  // not one of our stickers: keep scanning
+        setTimeout(function () { cb(c); }, 0); return true;               // true closes the scanner
+      });
+    };
+  } catch (e) { }
+  /** Opened from a sticker's "🔧 Log work (techs)" link (t.me/<bot>?startapp=u_CODE): go straight to that unit. */
+  function openStart() {
+    var sp = '';
+    try { sp = (TG && TG.initDataUnsafe && TG.initDataUnsafe.start_param) || ''; } catch (e) { }
+    sp = sp || hash.tgWebAppStartParam || qs.tgWebAppStartParam || '';
+    var m = String(sp).match(/^u_([A-Za-z0-9]{4,10})$/);
+    if (!m) return;
+    var code = m[1].toUpperCase();
+    function fire(w) { try { if (w && w.openCode) w.openCode(code); } catch (e) { } }
+    var w = win('tech');
+    if (w) { activate('tech'); fire(w); return; }
+    tab('tech').waiting.push(fire);
+    go({ p: 'tech' }, true);
+  }
+
   // ---- first screen ----
   ready.then(function () {
     ROLE = ls('pmRole') || '';
@@ -553,7 +583,7 @@
     if (!ROLE) { load(first, hash, false, true).then(afterFirst); return; }   // first time on this phone: ask the script who this is
     quickStart(first, hash).then(function (quick) { return quick ? true : load(first, hash, false, true); }).then(afterFirst);
   });
-  function afterFirst() { setTimeout(sync, 1500); setTimeout(prefetchAll, 700); }
+  function afterFirst() { openStart(); setTimeout(sync, 1500); setTimeout(prefetchAll, 700); }
 })();
 </script>
 </body>
