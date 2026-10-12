@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your equipment</title>
+<style>
+  :root { --navy:#0d1d38; --blue:#1f4e8c; --ink:#0f1b2d; --mut:#5b6675; --line:#e3e8ef; --bg:#eef1f5; --ok:#1f7a3a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:16px; }
+  .wrap { max-width:520px; margin:0 auto; padding:0 14px 40px; }
+  .hd { background:var(--navy); color:#fff; padding:18px 18px 20px; border-radius:0 0 18px 18px; margin:0 -14px 14px; }
+  .hd .co { font-size:13px; color:#ffb27a; font-weight:800; letter-spacing:.3px; margin-bottom:6px; }
+  .hd h1 { margin:0; font-size:22px; } .hd .sub { color:#b9c6da; font-size:14px; margin-top:4px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:12px; }
+  .big { font-size:30px; font-weight:800; letter-spacing:.5px; }
+  .lbl { color:var(--mut); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+  .row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  .row:first-of-type { border-top:0; } .row span:first-child { color:var(--mut); }
+  .btn { display:block; text-align:center; text-decoration:none; border-radius:12px; padding:15px; font-size:17px; font-weight:800; margin-top:10px; }
+  .pri { background:var(--blue); color:#fff; } .sec { background:#eaf1fb; color:var(--blue); }
+  .mut { color:var(--mut); font-size:14px; line-height:1.5; }
+</style></head>
+<body><div class="wrap" id="app"><div class="hd"><div class="co">🔥</div><h1>Loading…</h1></div></div>
+<script>
+(function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  var app = document.getElementById('app');
+  var code = (location.search.match(/[?&]s=([^&]+)/) || [])[1] || '';
+  var api = (location.hash.match(/api=([^&]+)/) || [])[1];
+  function say(t, sub) { app.innerHTML = '<div class="hd"><div class="co">🔥</div><h1>' + esc(t) + '</h1>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div>'; }
+  function draw(d) {
+    var head = '<div class="hd"><div class="co">🔥 ' + esc(d.company) + '</div>';
+    var call = d.phone ? '<a class="btn sec" href="tel:' + esc(d.phone) + '">📞 Call ' + esc(d.phone) + '</a>' : '';
+    if (d.bad || d.notLinked) {
+      app.innerHTML = head + '<h1>Maintained by ' + esc(d.company) + '</h1><div class="sub">Sticker ' + esc(d.code) + '</div></div>' +
+        '<div class="card"><div class="mut">' + (d.bad ? 'This sticker code isn’t one of ours.' : 'This sticker hasn’t been set up yet — your technician links it on the next visit.') + '</div>' + call + '</div>';
+      return;
+    }
+    var u = d.unit;
+    app.innerHTML = head + '<h1>Your ' + esc(u.type.toLowerCase()) + '</h1><div class="sub">' + esc([u.make, u.model].filter(Boolean).join(' ')) + '</div></div>' +
+      (u.filter ? '<div class="card"><div class="lbl">Filter size</div><div class="big">' + esc(u.filter) + '</div>' + (u.filterBrand ? '<div class="mut">' + esc(u.filterBrand) + '</div>' : '') + '</div>' : '') +
+      '<div class="card">' +
+        (d.last ? '<div class="row"><span>Last maintenance</span><b>' + esc(d.last) + '</b></div>' : '') +
+        (d.next ? '<div class="row"><span>Next due</span><b>' + esc(d.next) + '</b></div>' : '') +
+        (u.year ? '<div class="row"><span>Made</span><b>' + esc(u.year) + ' (' + esc(u.age) + ' years old)</b></div>' : '') +
+        (u.location ? '<div class="row"><span>Location</span><b>' + esc(u.location) + '</b></div>' : '') +
+      '</div>' +
+      (d.book ? '<a class="btn pri" href="' + esc(d.book) + '">📅 Book my next visit</a>' : '') + call +
+      '<p class="mut" style="text-align:center;margin-top:16px">Sticker ' + esc(d.code) + ' · ' + esc(d.company) + '</p>';
+    document.title = d.company;
+  }
+  function go(url) {
+    fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'app=1', { method: 'POST', body: JSON.stringify({ op: 'unitpage', s: code }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (!j.ok) throw new Error(j.error || 'error'); draw(j.result); })
+      .catch(function () { say('Sorry — this page didn’t load', 'Check your signal and scan again.'); });
+  }
+  if (!code) { say('Scan the sticker on your equipment'); return; }
+  if (api) { go(decodeURIComponent(api)); return; }
+  fetch('config.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (c) { go(c.api); }, function () { say('Sorry — this page isn’t set up yet'); });
+})();
+</script></body></html>
