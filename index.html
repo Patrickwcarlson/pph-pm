@@ -76,10 +76,10 @@
 <div id="frames"></div>
 <div id="home"><div style="font-size:26px">📲</div><div><b>Put PM Portal on your home screen</b>One tap to open — and it works with no signal.</div><button class="add" id="homeAdd">Set up</button><button class="x" id="homeX">✕</button></div>
 <div id="nav">
-  <button data-go="board"><span>📋</span>Board</button>
+  <button data-go="board"><span>🏠</span>Today</button>
   <button data-go="customers"><span>👥</span>Customers</button>
   <button data-go="schedule"><span>📅</span>Schedule</button>
-  <button data-go="setup"><span>⚙️</span>Setup</button>
+  <button data-go="setup"><span>⋯</span>More</button>
 </div>
 <div id="sheetbg"><div id="sheet"></div></div>
 <script>
@@ -473,6 +473,7 @@
       activate(name);
       var w = win(name);
       if (name === 'customers' && params.c && w && w.openCust) { try { w.openCust(params.c); } catch (e) { } }   // open that customer's card
+      else if (name === 'schedule' && params.v && w && w.tab) { try { w.CHOSEN = true; w.tab(params.v); } catch (e) { } quietRefresh(name, w); }   // open that Schedule tab
       else quietRefresh(name, w);
       return;
     }
