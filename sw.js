@@ -1,6 +1,6 @@
 // PPH PM Portal: keeps the app itself on the phone so it opens with no signal.
 // Customer data never goes through here — it lives in your Google sheet.
-var CACHE = 'pph-pm-v10';
+var CACHE = 'pph-pm-v11';
 var FILES = ['./', 'index.html', 'book.html', 'manifest.webmanifest', 'pph-pm-icon-192.png', 'pph-pm-icon-512.png', 'pph-pm-touch-icon.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
